@@ -7,8 +7,8 @@ from lstm_model import LSTM
 from optim import Adam
 
 # ---------- Config ----------
-TRAIN_PATH = "dataset/Corona_NLP_train.csv"
-TEST_PATH  = "dataset/Corona_NLP_test.csv"
+TRAIN_PATH = "Corona_NLP_train.csv"
+TEST_PATH  = "Corona_NLP_test.csv"
 MAX_LEN = 50
 MIN_FREQ = 2
 EMB_DIM = 100

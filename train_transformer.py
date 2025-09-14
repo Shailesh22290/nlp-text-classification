@@ -7,8 +7,8 @@ from transformer_model import Transformer
 from optim import Adam
 
 # Config (tune as needed)
-TRAIN_PATH = "dataset/Corona_NLP_train.csv"
-TEST_PATH  = "dataset/Corona_NLP_test.csv"
+TRAIN_PATH = "Corona_NLP_train.csv"
+TEST_PATH  = "Corona_NLP_test.csv"
 MAX_LEN = 50
 MIN_FREQ = 2
 EMB_DIM = 100   # must equal transformer's d_model

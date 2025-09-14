@@ -8,8 +8,8 @@ from rnn_model import init_embeddings, SimpleRNN, cross_entropy_loss_and_grad
 from optim import Adam
 
 # ---------- Config ----------
-TRAIN_PATH = "dataset/Corona_NLP_train.csv"
-TEST_PATH  = "dataset/Corona_NLP_test.csv"   # optional for final eval
+TRAIN_PATH = "Corona_NLP_train.csv"
+TEST_PATH  = "Corona_NLP_test.csv"   # optional for final eval
 MAX_LEN = 50
 MIN_FREQ = 2
 EMB_DIM = 100
