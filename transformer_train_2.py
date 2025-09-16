@@ -1,17 +1,15 @@
-# train_transformer_v2.py
 import os, time, numpy as np
 from preprocess import clean_text, tokenize, build_vocab, texts_to_sequences
 from utils import load_csv, save_json, compute_precision_recall_f1
 from transformer_model_v2 import TransformerEncoder
-from optim import Adam  # your numpy Adam
+from optim import Adam  
 
-# Config (tune)
 TRAIN_PATH = "Corona_NLP_train.csv"
 TEST_PATH  = "Corona_NLP_test.csv"
 MAX_LEN = 50
 MIN_FREQ = 2
-EMB_DIM = 100     # input embedding dim
-D_MODEL = 256     # model hidden dim (must be divisible by n_heads)
+EMB_DIM = 100     
+D_MODEL = 256    
 NUM_HEADS = 8
 D_FF = 512
 BATCH = 64
@@ -22,7 +20,6 @@ SAVE_DIR = "saved_models"
 os.makedirs(SAVE_DIR, exist_ok=True)
 np.random.seed(42)
 
-# Load data
 train_texts, train_labels = load_csv(TRAIN_PATH)
 test_texts, test_labels = load_csv(TEST_PATH)
 
@@ -33,7 +30,7 @@ id2label = {i:lab for lab,i in label2id.items()}
 y_train = np.array([label2id[l] for l in train_labels], dtype=np.int32)
 y_test = np.array([label2id.get(l,-1) for l in test_labels], dtype=np.int32)
 
-# Preprocess / vocab
+
 tokenized = [tokenize(clean_text(t)) for t in train_texts]
 word2idx = build_vocab(tokenized, min_freq=MIN_FREQ, add_special=True)
 vocab_size = len(word2idx)
@@ -42,12 +39,11 @@ print("Vocab size:", vocab_size)
 X_train = np.array(texts_to_sequences(train_texts, word2idx, max_len=MAX_LEN), dtype=np.int32)
 X_test = np.array(texts_to_sequences(test_texts, word2idx, max_len=MAX_LEN), dtype=np.int32)
 
-# Model
 model = TransformerEncoder(vocab_size=vocab_size, embed_dim=EMB_DIM, d_model=D_MODEL,
                            n_heads=NUM_HEADS, d_ff=D_FF, n_classes=len(unique_labels),
                            max_len=MAX_LEN, seed=42)
 
-# params dict for optimizer (flatten model attrs)
+
 params = {
     "Emb": model.Emb, "W_proj": model.W_proj,
     "Wq": model.Wq, "Wk": model.Wk, "Wv": model.Wv, "Wo": model.Wo,
@@ -60,10 +56,9 @@ params = {
 optimizer = Adam(params, lr=LR)
 
 def accumulate_embedding_grads(grad_Emb_updates):
-    # grad_Emb_updates already aggregated in grads["Emb"] returned by backward
     return grad_Emb_updates
 
-# Training loop
+
 N = X_train.shape[0]
 indices = np.arange(N)
 best_f1 = -1.0
@@ -74,12 +69,12 @@ for epoch in range(1, EPOCHS+1):
     total_loss = 0.0
     for i in range(0, N, BATCH):
         batch_idx = indices[i:i+BATCH]
-        Xb = X_train[batch_idx]    # (B,T)
+        Xb = X_train[batch_idx]   
         yb = y_train[batch_idx]
 
         logits, cache = model.forward(Xb)
-        # cross-entropy and dlogits
-        # stable softmax
+        
+       
         logits2 = logits - np.max(logits, axis=1, keepdims=True)
         exp = np.exp(logits2)
         probs = exp / np.sum(exp, axis=1, keepdims=True)
@@ -92,20 +87,20 @@ for epoch in range(1, EPOCHS+1):
 
         grads_model, grad_emb_updates = model.backward(dlogits, cache)
 
-        # build grads dict for optimizer
+      
         grads = {}
         grads["Emb"] = grad_emb_updates
-        # copy other grads
+        
         for k in ["W_proj","Wq","Wk","Wv","Wo","W1","b1","W2","b2","gamma_attn","beta_attn","gamma_ff","beta_ff","W_out","b_out"]:
             grads[k] = grads_model.get(k, np.zeros_like(params[k]))
 
-        # clip
+      
         for k in grads:
             np.clip(grads[k], -GRAD_CLIP, GRAD_CLIP, out=grads[k])
 
         optimizer.step(params, grads)
 
-        # sync params back to model object for next forward
+   
         model.Emb = params["Emb"]
         model.W_proj = params["W_proj"]
         model.Wq = params["Wq"]; model.Wk = params["Wk"]; model.Wv = params["Wv"]; model.Wo = params["Wo"]
@@ -117,8 +112,7 @@ for epoch in range(1, EPOCHS+1):
     avg_loss = total_loss / N
     t1 = time.time()
 
-    # evaluate
-    # batched inference
+  
     preds = []
     for j in range(0, X_test.shape[0], 256):
         xb = X_test[j:j+256]

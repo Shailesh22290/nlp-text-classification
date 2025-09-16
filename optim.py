@@ -1,9 +1,7 @@
-# optim.py
 import numpy as np
 
 class Adam:
     def __init__(self, params_dict, lr=1e-3, beta1=0.9, beta2=0.999, eps=1e-8):
-        # params_dict is a dict {name: np.array}, we only need shapes
         self.lr = lr
         self.beta1 = beta1
         self.beta2 = beta2
@@ -13,7 +11,7 @@ class Adam:
         self.t = 0
 
     def step(self, params, grads):
-        # params and grads are dicts with same keys
+   
         self.t += 1
         for k in params.keys():
             g = grads[k]

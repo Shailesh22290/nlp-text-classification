@@ -1,4 +1,3 @@
-# rnn_model.py
 import numpy as np
 
 def init_embeddings(vocab_size, dim=100, seed=42):
@@ -7,19 +6,15 @@ def init_embeddings(vocab_size, dim=100, seed=42):
     return rng.uniform(-limit, limit, (vocab_size, dim)).astype(np.float32)
 
 def softmax(logits):
-    # logits: (B, C)
     x = logits - np.max(logits, axis=1, keepdims=True)
     ex = np.exp(x)
     return ex / np.sum(ex, axis=1, keepdims=True)
 
 def cross_entropy_loss_and_grad(logits, y_true):
-    # logits: (B,C) ; y_true: (B,) ints
     B = logits.shape[0]
     probs = softmax(logits)
-    # loss
     correct = probs[np.arange(B), y_true]
     loss = -np.mean(np.log(correct + 1e-12))
-    # grad
     dlogits = probs
     dlogits[np.arange(B), y_true] -= 1
     dlogits /= B
@@ -29,7 +24,6 @@ class SimpleRNN:
     def __init__(self, input_dim, hidden_dim, output_dim, seed=42):
         rng = np.random.RandomState(seed)
         self.hidden_dim = hidden_dim
-        # weight shapes:
         self.params = {}
         self.params["Wx"] = (rng.randn(input_dim, hidden_dim) * 0.01).astype(np.float32)
         self.params["Wh"] = (rng.randn(hidden_dim, hidden_dim) * 0.01).astype(np.float32)
@@ -38,7 +32,6 @@ class SimpleRNN:
         self.params["b_out"] = np.zeros((output_dim,), dtype=np.float32)
 
     def forward(self, X_emb):
-        # X_emb: (B, T, D)
         B, T, D = X_emb.shape
         H = self.hidden_dim
         Wx = self.params["Wx"]
@@ -47,18 +40,17 @@ class SimpleRNN:
 
         hs = np.zeros((B, T, H), dtype=np.float32)
         h_prev = np.zeros((B, H), dtype=np.float32)
-        pre_act = np.zeros((B, T, H), dtype=np.float32)  # store z_t for backprop
+        pre_act = np.zeros((B, T, H), dtype=np.float32)  
         for t in range(T):
-            x_t = X_emb[:, t, :]         # (B, D)
-            z_t = x_t.dot(Wx) + h_prev.dot(Wh) + b  # (B, H)
+            x_t = X_emb[:, t, :]         
+            z_t = x_t.dot(Wx) + h_prev.dot(Wh) + b  
             h_t = np.tanh(z_t)
             pre_act[:, t, :] = z_t
             hs[:, t, :] = h_t
             h_prev = h_t
 
-        # logits from last hidden
-        h_last = hs[:, -1, :]  # (B, H)
-        logits = h_last.dot(self.params["W_out"]) + self.params["b_out"]  # (B, C)
+        h_last = hs[:, -1, :]  
+        logits = h_last.dot(self.params["W_out"]) + self.params["b_out"] 
 
         cache = {
             "X_emb": X_emb,
@@ -68,59 +60,45 @@ class SimpleRNN:
         return logits, cache
 
     def backward(self, dlogits, cache):
-        """
-        dlogits: (B, C)
-        cache contains X_emb (B,T,D), hs (B,T,H), pre_act (B,T,H)
-        returns:
-          grads: dict for model params (Wx, Wh, b, W_out, b_out)
-          dX_emb: gradient wrt input embeddings of shape (B,T,D)
-        """
         X_emb = cache["X_emb"]
         hs = cache["hs"]
         pre_act = cache["pre_act"]
         B, T, D = X_emb.shape
         H = self.hidden_dim
 
-        # grads init
         dWx = np.zeros_like(self.params["Wx"])
         dWh = np.zeros_like(self.params["Wh"])
         db = np.zeros_like(self.params["b"])
         dW_out = np.zeros_like(self.params["W_out"])
         db_out = np.zeros_like(self.params["b_out"])
 
-        # output layer grads
-        h_last = hs[:, -1, :]    # (B,H)
-        dW_out = h_last.T.dot(dlogits)  # (H, C)
-        db_out = np.sum(dlogits, axis=0)  # (C,)
+        h_last = hs[:, -1, :] 
+        dW_out = h_last.T.dot(dlogits) 
+        db_out = np.sum(dlogits, axis=0)  
 
-        # backprop into h_last
-        dh = dlogits.dot(self.params["W_out"].T)  # (B, H)
-        # initialize dh_next for BPTT
+        dh = dlogits.dot(self.params["W_out"].T) 
         dh_next = np.zeros((B, H), dtype=np.float32)
-        dX_emb = np.zeros_like(X_emb, dtype=np.float32)  # (B,T,D)
+        dX_emb = np.zeros_like(X_emb, dtype=np.float32)  
 
-        # iterate backwards in time
         for t in reversed(range(T)):
-            h_t = hs[:, t, :]            # (B,H)
+            h_t = hs[:, t, :]       
             h_prev = hs[:, t-1, :] if t-1 >= 0 else np.zeros_like(h_t)
-            # dh_total is gradient flowing into h_t from output (only at last step) + next step
             if t == T-1:
                 dh_total = dh + dh_next
             else:
                 dh_total = dh_next
 
-            # derivative of tanh: (1 - h_t^2)
-            dt = dh_total * (1.0 - h_t * h_t)  # (B,H)
+ 
+            dt = dh_total * (1.0 - h_t * h_t) 
 
-            # grads to params
-            x_t = X_emb[:, t, :]  # (B,D)
-            dWx += x_t.T.dot(dt)  # (D, H)
-            dWh += h_prev.T.dot(dt)  # (H, H)
-            db  += np.sum(dt, axis=0)  # (H,)
-
-            # grad wrt inputs and prev hidden
-            dX_emb[:, t, :] = dt.dot(self.params["Wx"].T)  # (B,D)
-            dh_next = dt.dot(self.params["Wh"].T)  # (B,H)
+   
+            x_t = X_emb[:, t, :]  
+            dWx += x_t.T.dot(dt)  
+            dWh += h_prev.T.dot(dt)  
+            db  += np.sum(dt, axis=0)  
+   
+            dX_emb[:, t, :] = dt.dot(self.params["Wx"].T)  
+            dh_next = dt.dot(self.params["Wh"].T)  
 
         grads = {
             "Wx": dWx,

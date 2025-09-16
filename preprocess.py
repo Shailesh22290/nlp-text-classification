@@ -1,4 +1,3 @@
-# preprocess.py
 import re
 from collections import Counter
 
@@ -12,7 +11,7 @@ def clean_text(s):
     return s
 
 def tokenize(s):
-    # simple whitespace tokenizer - deterministic and fine for assignment
+
     return s.split()
 
 def build_vocab(token_lists, min_freq=2, add_special=True):
@@ -40,4 +39,4 @@ def texts_to_sequences(texts, word2idx, max_len=50):
         if len(idxs) < max_len:
             idxs = idxs + [pad] * (max_len - len(idxs))
         seqs.append(idxs)
-    return seqs  # list of lists (int)
+    return seqs 

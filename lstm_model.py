@@ -1,6 +1,6 @@
-# lstm_model.py
+
 import numpy as np
-from rnn_model import softmax, cross_entropy_loss_and_grad  # reuse utils
+from rnn_model import softmax, cross_entropy_loss_and_grad  
 
 def sigmoid(x):
     return 1.0 / (1.0 + np.exp(-x))
@@ -11,7 +11,6 @@ class LSTM:
         self.hidden_dim = hidden_dim
         H, D, C = hidden_dim, input_dim, output_dim
 
-        # combine all gates into single weight matrices for efficiency
         self.params = {}
         self.params["Wx"] = (rng.randn(D, 4*H) * 0.01).astype(np.float32)
         self.params["Wh"] = (rng.randn(H, 4*H) * 0.01).astype(np.float32)
@@ -33,8 +32,8 @@ class LSTM:
         gates = np.zeros((B, T, 4*H), dtype=np.float32)
 
         for t in range(T):
-            x_t = X_emb[:, t, :]  # (B,D)
-            gates_t = x_t.dot(Wx) + h_t.dot(Wh) + b  # (B,4H)
+            x_t = X_emb[:, t, :]  
+            gates_t = x_t.dot(Wx) + h_t.dot(Wh) + b  
             i = sigmoid(gates_t[:, 0:H])
             f = sigmoid(gates_t[:, H:2*H])
             o = sigmoid(gates_t[:, 2*H:3*H])
@@ -46,7 +45,7 @@ class LSTM:
             cs[:, t, :] = c_t
             gates[:, t, :] = gates_t
 
-        logits = h_t.dot(self.params["W_out"]) + self.params["b_out"]  # last h
+        logits = h_t.dot(self.params["W_out"]) + self.params["b_out"] 
         cache = {"X_emb": X_emb, "hs": hs, "cs": cs, "gates": gates}
         return logits, cache
 
@@ -55,7 +54,6 @@ class LSTM:
         B, T, D = X_emb.shape
         H = self.hidden_dim
 
-        # grads init
         dWx = np.zeros_like(self.params["Wx"])
         dWh = np.zeros_like(self.params["Wh"])
         db  = np.zeros_like(self.params["b"])
@@ -63,12 +61,11 @@ class LSTM:
         db_out = np.zeros_like(self.params["b_out"])
         dX_emb = np.zeros_like(X_emb)
 
-        # output layer grads
         h_last = hs[:, -1, :]
         dW_out = h_last.T.dot(dlogits)
         db_out = np.sum(dlogits, axis=0)
 
-        dh_next = dlogits.dot(self.params["W_out"].T)  # (B,H)
+        dh_next = dlogits.dot(self.params["W_out"].T) 
         dc_next = np.zeros((B, H), dtype=np.float32)
 
         for t in reversed(range(T)):
@@ -83,7 +80,6 @@ class LSTM:
             o = sigmoid(gates_t[:, 2*H:3*H])
             g = np.tanh(gates_t[:, 3*H:4*H])
 
-            # backprop through output h_t = o * tanh(c_t)
             do = dh_next * np.tanh(c_t)
             dc = dh_next * o * (1 - np.tanh(c_t)**2) + dc_next
             di = dc * g
@@ -91,23 +87,19 @@ class LSTM:
             df = dc * c_prev
             dc_next = dc * f
 
-            # derivatives wrt pre-activations
             di_in = di * i * (1 - i)
             df_in = df * f * (1 - f)
             do_in = do * o * (1 - o)
             dg_in = dg * (1 - g*g)
-            dGates = np.hstack((di_in, df_in, do_in, dg_in))  # (B,4H)
+            dGates = np.hstack((di_in, df_in, do_in, dg_in))  
 
-            # grads to params
             x_t = X_emb[:, t, :]
             dWx += x_t.T.dot(dGates)
             dWh += h_prev.T.dot(dGates)
             db  += np.sum(dGates, axis=0)
 
-            # grads wrt inputs for embedding
             dX_emb[:, t, :] = dGates.dot(self.params["Wx"].T)
 
-            # pass gradients to previous h
             dh_next = dGates.dot(self.params["Wh"].T)
 
         grads = {
